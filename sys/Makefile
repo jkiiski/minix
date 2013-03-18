@@ -2,7 +2,7 @@
 
 .include <bsd.own.mk>
 
-SUBDIR=	arch \
+SUBDIR=	arch dev/pci \
 	net netinet netinet6 \
         \
 	sys ufs

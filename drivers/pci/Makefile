@@ -9,4 +9,6 @@ MAN=
 
 BINDIR?= /usr/sbin
 
+INCSDIR= /usr/include/dev/pci
+
 .include <minix.service.mk>

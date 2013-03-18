@@ -21,6 +21,7 @@
 #include <sys/ioc_tape.h>	/* 'M'			*/
 #include <sys/ioc_sound.h>	/* 's'			*/
 #include <sys/ioc_fb.h>		/* 'F'			*/
+#include <sys/ioc_pci.h>	/* 'P'			*/
 
 #if defined(_NETBSD_SOURCE)
 #define		TIOCDRAIN 	TCDRAIN

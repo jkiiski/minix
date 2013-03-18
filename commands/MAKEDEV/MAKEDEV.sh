@@ -23,7 +23,7 @@ case $#:$1 in
 	ttypa ttypb ttypc ttypd ttype ttypf \
 	ttyq0 ttyq1 ttyq2 ttyq3 ttyq4 ttyq5 ttyq6 ttyq7 ttyq8 ttyq9 \
 	ttyqa ttyqb ttyqc ttyqd ttyqe ttyqf \
-	eth klog random uds filter fbd hello fb0
+	eth klog random uds filter fbd hello fb0 pci
     ;;
 0:|1:-\?)
     cat >&2 <<EOF
@@ -53,6 +53,7 @@ Where key is one of the following:
   fbd                     # Make /dev/fbd
   hello                   # Make /dev/hello
   video                   # Make /dev/video
+  pci                     # Make /dev/pci
   std			  # All standard devices
 EOF
     exit 1
@@ -283,6 +284,11 @@ do
 	# framebuffer driver
 	$e mknod fb0 c 19 0
 	$e chmod 644 fb0
+	;;
+    pci)
+	# pci driver
+	$e mknod pci c 20 0
+	$e chmod 666 pci
 	;;
     *)
 	echo "$0: don't know about $dev" >&2

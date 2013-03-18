@@ -27,7 +27,13 @@ static void do_rescan_bus(message *mp);
 static void reply(message *mp, int result);
 static struct rs_pci *find_acl(int endpoint);
 
+static void do_pcidev_open(message *mp);
+static void do_pcidev_close(message *mp);
+static void do_pcidev_ioctl(message *mp);
+
 extern int debug;
+
+int pcidev_openct = 0;
 
 /* SEF functions and variables. */
 static void sef_local_startup(void);
@@ -77,6 +83,9 @@ int main(void)
 		case BUSC_PCI_SET_ACL: do_set_acl(&m); break;
 		case BUSC_PCI_DEL_ACL: do_del_acl(&m); break;
 		case BUSC_PCI_GET_BAR: do_get_bar(&m); break;
+		case DEV_OPEN: do_pcidev_open(&m); break;
+		case DEV_CLOSE: do_pcidev_close(&m); break;
+		case DEV_IOCTL_S: do_pcidev_ioctl(&m); break;
 		default:
 			printf("PCI: got message from %d, type %d\n",
 				m.m_source, m.m_type);
@@ -569,6 +578,150 @@ message *mp;
 		printf("do_rescan_bus: unable to send to %d: %d\n",
 			mp->m_source, r);
 	}
+}
+
+static void do_pcidev_open(mp)
+message *mp;
+{
+  int r;
+
+  /* Check minor device number */
+  if (mp->DEVICE != 0)
+	r = ENXIO;
+  else
+	r = OK;
+
+  mp->m_type = TASK_REPLY;
+  mp->REP_ENDPT = mp->USER_ENDPT;
+  mp->REP_STATUS = r;
+  r = send(mp->m_source, mp);
+  if (r != 0)
+  {
+	printf("do_pcidev_open: unable to send to %d: %d\n", mp->m_source, r);
+  }
+
+  pcidev_openct ++;
+}
+
+static void do_pcidev_close(mp)
+message *mp;
+{
+  int r;
+
+  /* Check minor device number */
+  if (mp->DEVICE != 0)
+	r = ENXIO;
+  else
+	r = OK;
+
+  mp->m_type = TASK_REPLY;
+  mp->REP_ENDPT = mp->USER_ENDPT;
+  mp->REP_STATUS = r;
+  r = send(mp->m_source, mp);
+  if (r != 0)
+  {
+	printf("do_pcidev_open: unable to send to %d: %d\n", mp->m_source, r);
+  }
+
+  pcidev_openct --;
+}
+
+static void do_pcidev_ioctl(mp)
+message *mp;
+{
+  int r = -1;
+  int s = -1;
+  u32_t tmp = 0;
+  /* TODO: fill with zeros? */
+  struct pioc_bdf_cfgreg bdf_cfgreg;
+  int devind = 0;
+
+  /* Check minor device number */
+  if (mp->DEVICE != 0)
+  {
+	r = ENXIO;
+  }
+  else
+  {
+
+  switch (mp->REQUEST)
+  {
+	case PIOCBDFCFGREAD:
+	case PIOCBDFCFGWRITE:
+		s = sys_safecopyfrom(mp->USER_ENDPT, (vir_bytes)mp->IO_GRANT, 0,
+			(vir_bytes)&bdf_cfgreg, sizeof(struct pioc_bdf_cfgreg));
+
+		if (s != OK)
+		{
+			r = s;
+		}
+		else if (!pci_find_dev(bdf_cfgreg.bus, bdf_cfgreg.device,
+			bdf_cfgreg.function, &devind))
+		{
+			/* When no device exists on a Bus-Device, Function 0 should
+			 * return 0xFFFF in the vendor id
+			 */
+			if (mp->REQUEST == PIOCBDFCFGREAD)
+			{
+				bdf_cfgreg.cfgreg.val = 0x0000FFFF;
+			}
+
+			r = OK;
+		}
+		else if (mp->REQUEST == PIOCBDFCFGREAD)
+		{
+			/* Read register */
+			s = pci_attr_r32_s(devind, bdf_cfgreg.cfgreg.reg, &tmp);
+
+			if (s == OK)
+			{
+				bdf_cfgreg.cfgreg.val = tmp;
+				r = OK;
+			}
+			else
+			{
+				r = s;
+			}
+		}
+		else
+		{
+			/* Write register */
+			pci_attr_w32(devind, bdf_cfgreg.cfgreg.reg,
+				bdf_cfgreg.cfgreg.val);
+
+			r = OK;
+		}
+
+		if (mp->REQUEST == PIOCBDFCFGREAD)
+		{
+			/* Even write back when copy sys_safecopyfrom failed.
+			 * TODO: Else might cause deadlock?
+			 */
+			s = sys_safecopyto(mp->USER_ENDPT, (vir_bytes)mp->IO_GRANT, 0,
+				(vir_bytes)&bdf_cfgreg, sizeof(struct pioc_bdf_cfgreg));
+
+			if (s != OK)
+				r = s;
+		}
+		break;
+
+
+	default:
+		r = ENOTTY;
+		break;
+  }
+
+  }
+
+  mp->m_type = TASK_REPLY;
+  mp->REP_ENDPT = mp->USER_ENDPT;
+  mp->REP_STATUS = r;
+  r = send(mp->m_source, mp);
+  if (r != 0)
+  {
+	printf("do_pcidev_open: unable to send to %d: %d\n",
+		mp->m_source, r);
+  }
 }
 
 
